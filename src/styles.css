@@ -246,9 +246,10 @@ a {
 .hero h1 {
   max-width: 920px;
   margin: 0;
-  font-size: clamp(4rem, 5.6vw, 5.7rem);
+  font-size: clamp(3.2rem, 5vw, 5.15rem);
   line-height: 1.02;
   letter-spacing: 0;
+  white-space: nowrap;
   text-transform: uppercase;
 }
 
@@ -1509,7 +1510,7 @@ a {
   }
 
   .hero h1 {
-    font-size: clamp(2rem, 10.3vw, 3.35rem);
+    font-size: clamp(1.62rem, 8.5vw, 3.05rem);
     line-height: 1.08;
     white-space: nowrap;
   }

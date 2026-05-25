@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import {
   ArrowRight,
   BadgeCheck,
+  Car,
   Gauge,
   Lock,
   MapPin,
@@ -12,12 +13,11 @@ import {
   Save,
   ShieldCheck,
   Trash2,
-  Truck,
   Upload,
   Wrench,
 } from 'lucide-react';
 import './styles.css';
-import heroImage from './assets/Novo Fundo.png';
+import heroImage from './assets/FUNDO.png';
 import logoImage from './assets/LOGO MAIOR.png';
 
 const galleryModules = import.meta.glob('./assets/FOTOS/*.{png,jpg,jpeg,webp}', {
@@ -91,7 +91,7 @@ type TireSlide = {
   eyebrow: string;
   title: string;
   description: string;
-  layout: 'grid' | 'recapagem';
+  layout: 'grid';
   items: TireItem[];
 };
 
@@ -114,39 +114,6 @@ const defaultTireShowcaseSlides: TireSlide[] = [
       { imageIndex: 3, measure: '11R22.5', brand: 'Michelin', value: 'R$00,00' },
       { imageIndex: 4, measure: '235/75R17.5', brand: 'Continental', value: 'R$00,00' },
       { imageIndex: 5, measure: '225/75R16', brand: 'Firestone', value: 'R$00,00' },
-    ],
-  },
-  {
-    id: 'recapados',
-    eyebrow: 'Pneu recapado',
-    title: 'Pneus recapados',
-    description: 'Alternativas revisadas para reduzir custo por quilometro no seu carro.',
-    layout: 'grid',
-    items: [
-      { imageIndex: 6, measure: '295/80R22.5', brand: 'Banda borrachuda', value: 'R$00,00' },
-      { imageIndex: 7, measure: '275/80R22.5', brand: 'Banda lisa', value: 'R$00,00' },
-      { imageIndex: 8, measure: '215/75R17.5', brand: 'Banda mista', value: 'R$00,00' },
-      { imageIndex: 9, measure: '11R22.5', brand: 'Banda direcional', value: 'R$00,00' },
-      { imageIndex: 10, measure: '235/75R17.5', brand: 'Banda regional', value: 'R$00,00' },
-      { imageIndex: 11, measure: '225/75R16', brand: 'Banda urbana', value: 'R$00,00' },
-    ],
-  },
-  {
-    id: 'recapagem',
-    eyebrow: 'Recapagem de pneus',
-    title: 'Recapagem de pneus',
-    description: 'Servicos de recapagem por medida para recuperar rendimento com seguranca.',
-    layout: 'recapagem',
-    items: [
-      { imageIndex: 2, measure: '295/80-22.5', brand: 'LISO', value: 'R$00,00' },
-      { imageIndex: 4, measure: '295/80-22.5', brand: 'MISTO', value: 'R$00,00' },
-      { imageIndex: 6, measure: '295/80-22.5', brand: 'BORRACHUDO', value: 'R$00,00' },
-      { imageIndex: 8, measure: '275/80-22.5', brand: 'LISO', value: 'R$00,00' },
-      { imageIndex: 10, measure: '275/80-22.5', brand: 'MISTO', value: 'R$00,00' },
-      { imageIndex: 0, measure: '275/80-22.5', brand: 'BORRACHUDO', value: 'R$00,00' },
-      { imageIndex: 1, measure: '11R22.5', brand: 'LISO', value: 'R$00,00' },
-      { imageIndex: 3, measure: '11R22.5', brand: 'MISTO', value: 'R$00,00' },
-      { imageIndex: 5, measure: '11R22.5', brand: 'BORRACHUDO', value: 'R$00,00' },
     ],
   },
 ] as TireSlide[];
@@ -184,7 +151,9 @@ function loadTireShowcaseSlides() {
       return defaultTireShowcaseSlides;
     }
 
-    return JSON.parse(savedSlides) as TireSlide[];
+    const parsedSlides = JSON.parse(savedSlides) as TireSlide[];
+    const passeioSlides = parsedSlides.filter((slide) => slide.id === 'novos');
+    return passeioSlides.length > 0 ? passeioSlides : defaultTireShowcaseSlides;
   } catch {
     return defaultTireShowcaseSlides;
   }
@@ -253,7 +222,7 @@ function App() {
   const [isEmployeeUnlocked, setIsEmployeeUnlocked] = useState(false);
   const [employeeError, setEmployeeError] = useState('');
   const selectedStore = editableStores.find((store) => store.id === selectedStoreId) ?? editableStores[0] ?? defaultStores[0];
-  const selectedTireSlide = tireShowcaseSlides[activeTireSlide];
+  const selectedTireSlide = tireShowcaseSlides[activeTireSlide] ?? tireShowcaseSlides[0] ?? defaultTireShowcaseSlides[0];
   const selectedStoreMap = `https://www.google.com/maps?q=${encodeURIComponent(selectedStore.address)}&output=embed`;
   const selectedStoreWhatsapp = `https://wa.me/${selectedStore.whatsapp}?text=${encodeURIComponent(
     `Olá! Vim pela landing page e quero atendimento na ${selectedStore.name}.`,
@@ -291,8 +260,8 @@ function App() {
     const targetSlide = tireShowcaseSlides[slideIndex];
     const nextItem: TireItem = {
       imageIndex: targetSlide.items.length % Math.max(galleryImages.length, 1),
-      measure: targetSlide.layout === 'recapagem' ? '295/80-22.5' : 'Nova medida',
-      brand: targetSlide.layout === 'recapagem' ? 'LISO' : 'Nova marca',
+      measure: 'Nova medida',
+      brand: 'Nova marca',
       value: 'R$00,00',
     };
 
@@ -511,7 +480,7 @@ function App() {
                   <div className="employee-category-heading">
                     <div>
                       <h2>{slideIndex + 1}. {slide.title}</h2>
-                      <p>{slide.layout === 'recapagem' ? 'Edite medida, tipo, imagem e valor.' : 'Edite medida, marca, imagem e valor.'}</p>
+                      <p>Edite medida, marca, imagem e valor.</p>
                     </div>
                     <button type="button" onClick={() => addTireItem(slideIndex)}>
                       <Plus size={18} />
@@ -533,7 +502,7 @@ function App() {
                             />
                           </label>
                           <label>
-                            {slide.layout === 'recapagem' ? 'Tipo' : 'Marca'}
+                            Marca
                             <input
                               value={item.brand}
                               onChange={(event) => updateTireItem(slideIndex, itemIndex, 'brand', event.target.value)}
@@ -815,7 +784,7 @@ function App() {
           </div>
 
           <p>
-            Pneus de Passeio, Recapagem de Pneus, Serviços de Borracharia, tudo aqui na <strong>Intercap Pneus.</strong>
+            Pneus de Passeio, alinhamento, balanceamento e serviços de borracharia, tudo aqui na <strong>Intercap Pneus.</strong>
           </p>
 
           <div className="hero-actions">
@@ -839,17 +808,17 @@ function App() {
 
         <div className="service-list">
           <article>
-            <Truck />
+            <Car />
             <h3>Pneus de passeio</h3>
-            <p>Pneus novos e pneus recapados para carros, SUVs e veículos leves.</p>
-          </article>
-          <article>
-            <Gauge />
-            <h3>Recapagem de pneus</h3>
-            <p>Serviço para recuperar pneus com qualidade, economia e mais rendimento para o seu carro.</p>
+            <p>Pneus novos para carros, SUVs e veículos leves.</p>
           </article>
           <article>
             <Wrench />
+            <h3>Alinhamento e balanceamento</h3>
+            <p>Serviços para deixar seu carro mais seguro, estável e confortável para rodar.</p>
+          </article>
+          <article>
+            <Gauge />
             <h3>Borracharia</h3>
             <p>Atendimento ágil para reparos, consertos e suporte em pneus de veículos leves.</p>
           </article>
@@ -865,56 +834,28 @@ function App() {
             <p>{selectedTireSlide.description}</p>
           </div>
 
-          <div className="showcase-tabs" role="tablist" aria-label="Selecionar tipo de pneu">
-            {tireShowcaseSlides.map((slide, slideIndex) => (
-              <button
-                key={slide.id}
-                className={slideIndex === activeTireSlide ? 'active' : ''}
-                type="button"
-                role="tab"
-                aria-selected={slideIndex === activeTireSlide}
-                onClick={() => {
-                  setActiveTireSlide(slideIndex);
-                  setIsTireShowcasePinned(true);
-                }}
-              >
-                {slide.title}
-              </button>
-            ))}
-          </div>
+          {tireShowcaseSlides.length > 1 && (
+            <div className="showcase-tabs" role="tablist" aria-label="Selecionar tipo de pneu">
+              {tireShowcaseSlides.map((slide, slideIndex) => (
+                <button
+                  key={slide.id}
+                  className={slideIndex === activeTireSlide ? 'active' : ''}
+                  type="button"
+                  role="tab"
+                  aria-selected={slideIndex === activeTireSlide}
+                  onClick={() => {
+                    setActiveTireSlide(slideIndex);
+                    setIsTireShowcasePinned(true);
+                  }}
+                >
+                  {slide.title}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className={`showcase-panel showcase-panel-${selectedTireSlide.layout}`}>
-          {selectedTireSlide.layout === 'recapagem' ? (
-            <div className="recapage-mural">
-              {Array.from(new Set(selectedTireSlide.items.map((item) => item.measure))).map((measure) => (
-                <div key={measure} className="recapage-row">
-                  <h3>{measure}</h3>
-                  <div className="price-mural">
-                    {selectedTireSlide.items
-                      .filter((item) => item.measure === measure)
-                      .map((item) => {
-                        const imageSrc = getItemImage(item);
-                        const imageAlt = galleryImages[item.imageIndex % galleryImages.length]?.alt ?? item.brand;
-
-                        return (
-                          <article key={`${selectedTireSlide.id}-${item.measure}-${item.brand}`} className="price-card recapage-card">
-                            <img className="price-card-image" src={imageSrc} alt={imageAlt} loading="lazy" />
-                            <div className="price-card-copy">
-                              <strong>{item.brand}</strong>
-                              <em>{item.value}</em>
-                            </div>
-                            <a className="price-whatsapp" href={whatsappUrl} target="_blank" rel="noreferrer">
-                              CHAME AGORA!
-                            </a>
-                          </article>
-                        );
-                      })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
           <div className="price-mural">
             {selectedTireSlide.items.map((item) => {
               const imageSrc = getItemImage(item);
@@ -935,13 +876,12 @@ function App() {
               );
             })}
           </div>
-          )}
         </div>
       </section>
 
       <section id="contato" className="contact-band">
         <div>
-          <h2>CHAME AGORA E ENCONTRE O PNEU CERTO PARA O SEU CAMINHÃO.</h2>
+          <h2>CHAME AGORA E ENCONTRE O PNEU CERTO PARA O SEU CARRO.</h2>
         </div>
         <a className="primary-button contact-button" href={whatsappUrl} target="_blank" rel="noreferrer">
           <MessageCircle size={22} />
