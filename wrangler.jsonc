@@ -1,0 +1,15 @@
+{
+  "name": "pneuspasseioweb",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-06-09",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "SITE_CONTENT"
+    }
+  ]
+}

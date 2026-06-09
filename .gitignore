@@ -7,3 +7,5 @@ mobile-*-check.png
 locations-check.png
 vite.config.js
 vite.config.d.ts
+.wrangler/
+.wrangler-dry-run/

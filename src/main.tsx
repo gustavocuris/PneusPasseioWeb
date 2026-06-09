@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import {
   ArrowRight,
@@ -69,7 +69,7 @@ const defaultStores: Store[] = [
   },
   {
     id: 'novo-osasco',
-    name: 'Loja Novo Osasco',
+    name: 'Loja Vila Osasco',
     address: 'Av. Visc. de Nova Granada, 42A - Vila Osasco, Osasco - SP',
     phone: '(11) 3683-4125',
     whatsapp: '551136834125',
@@ -91,14 +91,22 @@ type TireSlide = {
   eyebrow: string;
   title: string;
   description: string;
-  layout: 'grid';
+  layout: 'grid' | 'recapagem';
   items: TireItem[];
+};
+
+type SiteContent = {
+  tireShowcaseSlides: TireSlide[];
+  galleryImages: GalleryImage[];
+  stores: Store[];
 };
 
 const tireStorageKey = 'intercap-tire-showcase';
 const galleryStorageKey = 'intercap-gallery-images';
 const storesStorageKey = 'intercap-stores';
 const employeePassword = 'IPN@2026';
+const siteContentApi = '/api/site-content';
+const maxOnlineContentSize = 20 * 1024 * 1024;
 
 const defaultTireShowcaseSlides: TireSlide[] = [
   {
@@ -108,12 +116,12 @@ const defaultTireShowcaseSlides: TireSlide[] = [
     description: 'Opcoes para carros de passeio com medida, marca e valor para consulta rapida.',
     layout: 'grid',
     items: [
-      { imageIndex: 0, measure: '295/80R22.5', brand: 'Bridgestone', value: 'R$00,00' },
-      { imageIndex: 1, measure: '275/80R22.5', brand: 'Goodyear', value: 'R$00,00' },
-      { imageIndex: 2, measure: '215/75R17.5', brand: 'Pirelli', value: 'R$00,00' },
-      { imageIndex: 3, measure: '11R22.5', brand: 'Michelin', value: 'R$00,00' },
-      { imageIndex: 4, measure: '235/75R17.5', brand: 'Continental', value: 'R$00,00' },
-      { imageIndex: 5, measure: '225/75R16', brand: 'Firestone', value: 'R$00,00' },
+      { imageIndex: 0, measure: '175/70R14', brand: 'Bridgestone', value: 'R$00,00' },
+      { imageIndex: 1, measure: '185/65R15', brand: 'Goodyear', value: 'R$00,00' },
+      { imageIndex: 2, measure: '195/55R15', brand: 'Pirelli', value: 'R$00,00' },
+      { imageIndex: 3, measure: '205/55R16', brand: 'Michelin', value: 'R$00,00' },
+      { imageIndex: 4, measure: '215/60R17', brand: 'Continental', value: 'R$00,00' },
+      { imageIndex: 5, measure: '225/45R17', brand: 'Firestone', value: 'R$00,00' },
     ],
   },
 ] as TireSlide[];
@@ -138,7 +146,9 @@ function loadStores() {
       return defaultStores;
     }
 
-    return JSON.parse(savedStores) as Store[];
+    return (JSON.parse(savedStores) as Store[]).map((store) =>
+      store.name === 'Loja Novo Osasco' ? { ...store, name: 'Loja Vila Osasco' } : store,
+    );
   } catch {
     return defaultStores;
   }
@@ -157,6 +167,20 @@ function loadTireShowcaseSlides() {
   } catch {
     return defaultTireShowcaseSlides;
   }
+}
+
+function getCurrentSiteContent(tireShowcaseSlides: TireSlide[], editableGalleryImages: GalleryImage[], editableStores: Store[]) {
+  return {
+    tireShowcaseSlides,
+    galleryImages: editableGalleryImages,
+    stores: editableStores,
+  };
+}
+
+function persistLocalContent(content: SiteContent) {
+  window.localStorage.setItem(tireStorageKey, JSON.stringify(content.tireShowcaseSlides));
+  window.localStorage.setItem(galleryStorageKey, JSON.stringify(content.galleryImages));
+  window.localStorage.setItem(storesStorageKey, JSON.stringify(content.stores));
 }
 
 function getItemImage(item: TireItem) {
@@ -182,7 +206,7 @@ function compressImageFile(file: File) {
 
       image.onerror = () => resolve(source);
       image.onload = () => {
-        const maxSize = 1200;
+        const maxSize = 900;
         const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
         const width = Math.max(1, Math.round(image.width * scale));
         const height = Math.max(1, Math.round(image.height * scale));
@@ -197,7 +221,7 @@ function compressImageFile(file: File) {
         canvas.width = width;
         canvas.height = height;
         context.drawImage(image, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.82));
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
       };
 
       image.src = source;
@@ -205,6 +229,15 @@ function compressImageFile(file: File) {
 
     reader.readAsDataURL(file);
   });
+}
+
+async function readApiError(response: Response) {
+  try {
+    const error = (await response.json()) as { message?: string };
+    return error.message || `Erro ${response.status}`;
+  } catch {
+    return `Erro ${response.status}`;
+  }
 }
 
 function App() {
@@ -221,12 +254,51 @@ function App() {
   const [typedEmployeePassword, setTypedEmployeePassword] = useState('');
   const [isEmployeeUnlocked, setIsEmployeeUnlocked] = useState(false);
   const [employeeError, setEmployeeError] = useState('');
+  const [saveStatus, setSaveStatus] = useState('');
   const selectedStore = editableStores.find((store) => store.id === selectedStoreId) ?? editableStores[0] ?? defaultStores[0];
   const selectedTireSlide = tireShowcaseSlides[activeTireSlide] ?? tireShowcaseSlides[0] ?? defaultTireShowcaseSlides[0];
   const selectedStoreMap = `https://www.google.com/maps?q=${encodeURIComponent(selectedStore.address)}&output=embed`;
   const selectedStoreWhatsapp = `https://wa.me/${selectedStore.whatsapp}?text=${encodeURIComponent(
     `Olá! Vim pela landing page e quero atendimento na ${selectedStore.name}.`,
   )}`;
+
+  const applySiteContent = useCallback((content: SiteContent) => {
+    const passeioSlides = content.tireShowcaseSlides.filter((slide) => slide.id === 'novos');
+    setTireShowcaseSlides(passeioSlides.length > 0 ? passeioSlides : defaultTireShowcaseSlides);
+    setEditableGalleryImages(content.galleryImages);
+    const passeioStores = content.stores.map((store) =>
+      store.name === 'Loja Novo Osasco' ? { ...store, name: 'Loja Vila Osasco' } : store,
+    );
+    setEditableStores(passeioStores);
+    persistLocalContent({
+      ...content,
+      tireShowcaseSlides: passeioSlides.length > 0 ? passeioSlides : defaultTireShowcaseSlides,
+      stores: passeioStores,
+    });
+  }, []);
+
+  const loadOnlineContent = useCallback(async () => {
+    try {
+      const response = await fetch(siteContentApi, { cache: 'no-store' });
+
+      if (response.status === 404) {
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+
+      const content = (await response.json()) as SiteContent;
+      applySiteContent(content);
+    } catch (error) {
+      setSaveStatus(
+        error instanceof Error && error.message.includes('SITE_CONTENT')
+          ? 'Modo offline: o armazenamento online SITE_CONTENT ainda nao esta conectado no Cloudflare.'
+          : 'Modo offline: usando dados salvos neste aparelho.',
+      );
+    }
+  }, [applySiteContent]);
 
   const persistTireSlides = (nextSlides: TireSlide[]) => {
     setTireShowcaseSlides(nextSlides);
@@ -256,12 +328,32 @@ function App() {
     compressImageFile(file).then((imageSrc) => updateTireItem(slideIndex, itemIndex, 'imageSrc', imageSrc));
   };
 
+  const getDroppedImageFile = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    const file = Array.from(event.dataTransfer.files).find((droppedFile) => droppedFile.type.startsWith('image/'));
+
+    if (!file) {
+      setSaveStatus('Arraste apenas arquivos de imagem.');
+    }
+
+    return file ?? null;
+  };
+
+  const allowImageDrop = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  };
+
+  const dropTireImage = (event: React.DragEvent<HTMLElement>, slideIndex: number, itemIndex: number) => {
+    uploadTireImage(slideIndex, itemIndex, getDroppedImageFile(event));
+  };
+
   const addTireItem = (slideIndex: number) => {
     const targetSlide = tireShowcaseSlides[slideIndex];
     const nextItem: TireItem = {
       imageIndex: targetSlide.items.length % Math.max(galleryImages.length, 1),
-      measure: 'Nova medida',
-      brand: 'Nova marca',
+      measure: targetSlide.layout === 'recapagem' ? '295/80-22.5' : 'Nova medida',
+      brand: targetSlide.layout === 'recapagem' ? 'LISO' : 'Nova marca',
       value: 'R$00,00',
     };
 
@@ -319,6 +411,10 @@ function App() {
     compressImageFile(file).then((imageSrc) => updateGalleryImage(imageIndex, 'src', imageSrc));
   };
 
+  const dropGalleryImage = (event: React.DragEvent<HTMLElement>, imageIndex: number) => {
+    uploadGalleryImage(imageIndex, getDroppedImageFile(event));
+  };
+
   const addGalleryImage = () => {
     persistGalleryImages([
       ...editableGalleryImages,
@@ -345,14 +441,48 @@ function App() {
     }
   };
 
-  const saveEmployeeChanges = () => {
+  const saveEmployeeChanges = async () => {
+    const content = getCurrentSiteContent(tireShowcaseSlides, editableGalleryImages, editableStores);
+    const body = JSON.stringify(content);
+    const bodySize = new Blob([body]).size;
+
     try {
-      window.localStorage.setItem(tireStorageKey, JSON.stringify(tireShowcaseSlides));
-      window.localStorage.setItem(galleryStorageKey, JSON.stringify(editableGalleryImages));
-      window.localStorage.setItem(storesStorageKey, JSON.stringify(editableStores));
+      if (bodySize > maxOnlineContentSize) {
+        throw new Error('As imagens ficaram grandes demais para salvar online. Tente usar fotos menores.');
+      }
+
+      setSaveStatus('Salvando para todos...');
+      const response = await fetch(siteContentApi, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Employee-Password': employeePassword,
+        },
+        body,
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+
+      persistLocalContent(content);
       setHasUnsavedChanges(false);
-    } catch {
-      window.alert('Nao foi possivel salvar. Tente usar imagens menores.');
+      setSaveStatus('Alteracao salva para todos os visitantes.');
+    } catch (error) {
+      try {
+        persistLocalContent(content);
+      } catch {
+        window.alert('Nao foi possivel salvar. Tente usar imagens menores.');
+        return;
+      }
+
+      setSaveStatus(
+        error instanceof Error && error.message.includes('SITE_CONTENT')
+          ? 'Nao foi possivel salvar online: conecte o KV SITE_CONTENT no Cloudflare e publique novamente.'
+          : error instanceof Error
+            ? error.message
+            : 'Nao foi possivel salvar online. Verifique o armazenamento da Cloudflare.',
+      );
     }
   };
 
@@ -372,12 +502,20 @@ function App() {
     compressImageFile(file).then((imageSrc) => updateStore(storeIndex, 'imageSrc', imageSrc));
   };
 
+  const dropStoreImage = (event: React.DragEvent<HTMLElement>, storeIndex: number) => {
+    uploadStoreImage(storeIndex, getDroppedImageFile(event));
+  };
+
   const uploadStoreSecondImage = (storeIndex: number, file: File | null) => {
     if (!file) {
       return;
     }
 
     compressImageFile(file).then((imageSrc) => updateStore(storeIndex, 'imageSrcTwo', imageSrc));
+  };
+
+  const dropStoreSecondImage = (event: React.DragEvent<HTMLElement>, storeIndex: number) => {
+    uploadStoreSecondImage(storeIndex, getDroppedImageFile(event));
   };
 
   const addStore = () => {
@@ -414,7 +552,23 @@ function App() {
     }, 10000);
 
     return () => window.clearInterval(intervalId);
-  }, [isTireShowcasePinned]);
+  }, [isTireShowcasePinned, tireShowcaseSlides.length]);
+
+  useEffect(() => {
+    loadOnlineContent();
+  }, [loadOnlineContent]);
+
+  useEffect(() => {
+    if (isEmployeePage && hasUnsavedChanges) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      loadOnlineContent();
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [hasUnsavedChanges, isEmployeePage, loadOnlineContent]);
 
   if (isEmployeePage) {
     return (
@@ -455,7 +609,8 @@ function App() {
                 <div>
                   <span>Area interna</span>
                   <h1>Painel de edicao</h1>
-                  <p>Depois de alterar, clique em Salvar alteracao para gravar neste navegador.</p>
+                  <p>Depois de alterar, clique em Salvar alteracao para publicar para todos.</p>
+                  {saveStatus && <p className="employee-save-status">{saveStatus}</p>}
                 </div>
                 <a className="employee-save-note" href="/">
                   <Save size={18} />
@@ -480,7 +635,7 @@ function App() {
                   <div className="employee-category-heading">
                     <div>
                       <h2>{slideIndex + 1}. {slide.title}</h2>
-                      <p>Edite medida, marca, imagem e valor.</p>
+                      <p>{slide.layout === 'recapagem' ? 'Edite medida, tipo, imagem e valor.' : 'Edite medida, marca, imagem e valor.'}</p>
                     </div>
                     <button type="button" onClick={() => addTireItem(slideIndex)}>
                       <Plus size={18} />
@@ -492,7 +647,14 @@ function App() {
                     {slide.items.map((item, itemIndex) => (
                       <article key={`${slide.id}-${itemIndex}`} className="employee-item-card">
                         <span className="employee-item-number">{itemIndex + 1}</span>
-                        <img src={getItemImage(item)} alt={item.brand || item.measure} />
+                        <div
+                          className="employee-image-dropzone employee-tire-dropzone"
+                          onDragOver={allowImageDrop}
+                          onDrop={(event) => dropTireImage(event, slideIndex, itemIndex)}
+                        >
+                          <img src={getItemImage(item)} alt={item.brand || item.measure} />
+                          <span>Arraste a imagem aqui</span>
+                        </div>
                         <div className="employee-item-fields">
                           <label>
                             Medida
@@ -502,7 +664,7 @@ function App() {
                             />
                           </label>
                           <label>
-                            Marca
+                            {slide.layout === 'recapagem' ? 'Tipo' : 'Marca'}
                             <input
                               value={item.brand}
                               onChange={(event) => updateTireItem(slideIndex, itemIndex, 'brand', event.target.value)}
@@ -564,7 +726,14 @@ function App() {
                     {editableGalleryImages.map((image, imageIndex) => (
                       <article key={`${image.src}-${imageIndex}`} className="employee-gallery-card">
                         <span className="employee-item-number">{imageIndex + 1}</span>
-                        <img src={image.src} alt={image.alt} />
+                        <div
+                          className="employee-image-dropzone employee-gallery-dropzone"
+                          onDragOver={allowImageDrop}
+                          onDrop={(event) => dropGalleryImage(event, imageIndex)}
+                        >
+                          <img src={image.src} alt={image.alt} />
+                          <span>Arraste a imagem aqui</span>
+                        </div>
                         <label>
                           Nome/descricao da foto
                           <input value={image.alt} onChange={(event) => updateGalleryImage(imageIndex, 'alt', event.target.value)} />
@@ -618,8 +787,22 @@ function App() {
                       <article key={store.id} className="employee-store-card">
                         <span className="employee-item-number">{storeIndex + 1}</span>
                         <div className="employee-store-images">
-                          <img className="employee-store-image" src={getStoreImage(store)} alt={`${store.name} imagem 1`} />
-                          <img className="employee-store-image" src={getStoreSecondImage(store)} alt={`${store.name} imagem 2`} />
+                          <div
+                            className="employee-image-dropzone employee-store-dropzone"
+                            onDragOver={allowImageDrop}
+                            onDrop={(event) => dropStoreImage(event, storeIndex)}
+                          >
+                            <img className="employee-store-image" src={getStoreImage(store)} alt={`${store.name} imagem 1`} />
+                            <span>Imagem 1</span>
+                          </div>
+                          <div
+                            className="employee-image-dropzone employee-store-dropzone"
+                            onDragOver={allowImageDrop}
+                            onDrop={(event) => dropStoreSecondImage(event, storeIndex)}
+                          >
+                            <img className="employee-store-image" src={getStoreSecondImage(store)} alt={`${store.name} imagem 2`} />
+                            <span>Imagem 2</span>
+                          </div>
                         </div>
                         <label>
                           Nome da loja
@@ -784,13 +967,17 @@ function App() {
           </div>
 
           <p>
-            Pneus de Passeio, alinhamento, balanceamento e serviços de borracharia, tudo aqui na <strong>Intercap Pneus.</strong>
+            Pneus de Passeio, Alinhamento, Balanceamento e Serviços de Borracharia, Tudo Aqui na <strong>Intercap Pneus.</strong>
           </p>
 
           <div className="hero-actions">
-            <a className="primary-button title-button" href={whatsappUrl} target="_blank" rel="noreferrer">
+            <a className="primary-button title-button" href="#unidades">
               <MessageCircle size={22} />
-              Falar no WhatsApp
+              <span>
+                Conheça as nossas lojas e
+                <br />
+                fale com nossos atendentes
+              </span>
               <ArrowRight size={20} />
             </a>
             <div className="quick-proof">
@@ -810,17 +997,17 @@ function App() {
           <article>
             <Car />
             <h3>Pneus de passeio</h3>
-            <p>Pneus novos para carros, SUVs e veículos leves.</p>
+            <p>Pneus novos para Carros, Caminhonetes, SUVs e Vans.</p>
           </article>
           <article>
-            <Wrench />
+            <Gauge />
             <h3>Alinhamento e balanceamento</h3>
             <p>Serviços para deixar seu carro mais seguro, estável e confortável para rodar.</p>
           </article>
           <article>
-            <Gauge />
+            <Wrench />
             <h3>Borracharia</h3>
-            <p>Atendimento ágil para reparos, consertos e suporte em pneus de veículos leves.</p>
+            <p>Atendimento ágil para reparos, consertos e suporte em pneus de veículos leves e pesados.</p>
           </article>
           
         </div>
@@ -834,28 +1021,56 @@ function App() {
             <p>{selectedTireSlide.description}</p>
           </div>
 
-          {tireShowcaseSlides.length > 1 && (
-            <div className="showcase-tabs" role="tablist" aria-label="Selecionar tipo de pneu">
-              {tireShowcaseSlides.map((slide, slideIndex) => (
-                <button
-                  key={slide.id}
-                  className={slideIndex === activeTireSlide ? 'active' : ''}
-                  type="button"
-                  role="tab"
-                  aria-selected={slideIndex === activeTireSlide}
-                  onClick={() => {
-                    setActiveTireSlide(slideIndex);
-                    setIsTireShowcasePinned(true);
-                  }}
-                >
-                  {slide.title}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="showcase-tabs" role="tablist" aria-label="Selecionar tipo de pneu">
+            {tireShowcaseSlides.map((slide, slideIndex) => (
+              <button
+                key={slide.id}
+                className={slideIndex === activeTireSlide ? 'active' : ''}
+                type="button"
+                role="tab"
+                aria-selected={slideIndex === activeTireSlide}
+                onClick={() => {
+                  setActiveTireSlide(slideIndex);
+                  setIsTireShowcasePinned(true);
+                }}
+              >
+                {slide.title}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className={`showcase-panel showcase-panel-${selectedTireSlide.layout}`}>
+          {selectedTireSlide.layout === 'recapagem' ? (
+            <div className="recapage-mural">
+              {Array.from(new Set(selectedTireSlide.items.map((item) => item.measure))).map((measure) => (
+                <div key={measure} className="recapage-row">
+                  <h3>{measure}</h3>
+                  <div className="price-mural">
+                    {selectedTireSlide.items
+                      .filter((item) => item.measure === measure)
+                      .map((item) => {
+                        const imageSrc = getItemImage(item);
+                        const imageAlt = galleryImages[item.imageIndex % galleryImages.length]?.alt ?? item.brand;
+
+                        return (
+                          <article key={`${selectedTireSlide.id}-${item.measure}-${item.brand}`} className="price-card recapage-card">
+                            <img className="price-card-image" src={imageSrc} alt={imageAlt} loading="lazy" />
+                            <div className="price-card-copy">
+                              <strong>{item.brand}</strong>
+                              <em>{item.value}</em>
+                            </div>
+                            <a className="price-whatsapp" href={whatsappUrl} target="_blank" rel="noreferrer">
+                              CHAME AGORA!
+                            </a>
+                          </article>
+                        );
+                      })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
           <div className="price-mural">
             {selectedTireSlide.items.map((item) => {
               const imageSrc = getItemImage(item);
@@ -876,6 +1091,7 @@ function App() {
               );
             })}
           </div>
+          )}
         </div>
       </section>
 
@@ -883,15 +1099,11 @@ function App() {
         <div>
           <h2>CHAME AGORA E ENCONTRE O PNEU CERTO PARA O SEU CARRO.</h2>
         </div>
-        <a className="primary-button contact-button" href={whatsappUrl} target="_blank" rel="noreferrer">
-          <MessageCircle size={22} />
-          Abrir WhatsApp
-        </a>
       </section>
 
       <section id="unidades" className="locations-section">
         <div className="locations-copy">
-          <h2>ONDE ESTAMOS:</h2>
+          <h2>2 ENDEREÇOS EM OSASCO:</h2>
 
           <div className="store-tabs" role="tablist" aria-label="Selecionar unidade">
             {editableStores.map((store) => (
@@ -918,7 +1130,7 @@ function App() {
             </p>
             <a className="primary-button store-button" href={selectedStoreWhatsapp} target="_blank" rel="noreferrer">
               <MessageCircle size={21} />
-              Chamar esta loja
+              WhatsApp da loja
               <ArrowRight size={19} />
             </a>
           </div>
@@ -952,11 +1164,11 @@ function App() {
         <div className="footer-meta">
           <div className="footer-pill">
             <ShieldCheck size={17} />
-            Security, trust and performance
+            Segurança, confiança e performance
           </div>
           <div className="footer-pill">
             <MapPin size={17} />
-            Tire service for passenger cars in Osasco
+            Atendimento em pneus de passeio em Osasco
           </div>
           <div className="footer-credit">
             Developed by <strong>Gustavo Curis de Francisco</strong>
@@ -964,12 +1176,8 @@ function App() {
           <a className="employee-access-link" href="/funcionario">Acesso funcionario</a>
         </div>
       </footer>
-      <a className="floating-whatsapp" href={whatsappUrl} target="_blank" rel="noreferrer" aria-label="Falar no WhatsApp">
-        <MessageCircle size={30} />
-      </a>
     </main>
   );
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
-

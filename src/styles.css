@@ -312,7 +312,14 @@ a {
   border: 1px solid rgba(255, 255, 255, 0.22);
   font-size: 1.12rem;
   letter-spacing: 0;
+  line-height: 1.18;
+  text-align: center;
   text-transform: uppercase;
+}
+
+.title-button span {
+  flex: 1;
+  text-align: center;
 }
 
 .primary-button::before {
@@ -628,22 +635,24 @@ a {
 .contact-band {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: clamp(18px, 3vw, 42px);
   padding-block: 54px;
+  text-align: center;
   background:
     linear-gradient(135deg, rgba(34, 209, 96, 0.22), rgba(8, 95, 48, 0.2)),
     rgba(18, 24, 32, 0.92);
 }
 
 .contact-band > div {
-  flex: 1 1 auto;
+  flex: 1 1 100%;
+  width: 100%;
   min-width: 0;
 }
 
 .contact-band h2 {
   max-width: 1180px;
-  margin: 0;
+  margin: 0 auto;
   font-size: clamp(1.55rem, 2.05vw, 2.25rem);
   line-height: 1.12;
   white-space: normal;
@@ -720,6 +729,7 @@ a {
 }
 
 .locations-section {
+  scroll-margin-top: 88px;
   display: grid;
   grid-template-columns: minmax(320px, 0.82fr) minmax(420px, 1.18fr);
   gap: clamp(24px, 5vw, 70px);
@@ -739,10 +749,11 @@ a {
 }
 
 .locations-copy h2 {
-  width: min(560px, 100%);
-  max-width: 680px;
-  font-size: clamp(1.95rem, 3.4vw, 3.6rem);
+  width: min(520px, 100%);
+  max-width: 520px;
+  font-size: clamp(1.75rem, 2.65vw, 2.85rem);
   text-align: center;
+  white-space: nowrap;
 }
 
 .store-tabs {
@@ -1060,6 +1071,13 @@ a {
   text-transform: uppercase;
 }
 
+.employee-save-status {
+  margin-top: 10px;
+  color: #52ff97;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
 .employee-error {
   margin: 0;
   color: #ff8a8a;
@@ -1164,11 +1182,51 @@ a {
   font-weight: 950;
 }
 
-.employee-item-card img {
+.employee-image-dropzone {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border: 1px dashed rgba(86, 255, 154, 0.42);
+  border-radius: 8px;
+  background: rgba(86, 255, 154, 0.06);
+}
+
+.employee-image-dropzone img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 7px;
+}
+
+.employee-image-dropzone span {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  left: 6px;
+  display: grid;
+  min-height: 24px;
+  place-items: center;
+  border-radius: 6px;
+  color: #07140c;
+  background: rgba(86, 255, 154, 0.9);
+  font-size: 0.62rem;
+  font-weight: 950;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.employee-image-dropzone:hover,
+.employee-image-dropzone:focus-within {
+  border-color: rgba(86, 255, 154, 0.86);
+  box-shadow: 0 0 0 3px rgba(86, 255, 154, 0.12);
+}
+
+.employee-tire-dropzone {
   width: 132px;
   height: 132px;
-  object-fit: cover;
-  border-radius: 8px;
 }
 
 .employee-item-fields {
@@ -1222,12 +1280,8 @@ a {
   background: rgba(4, 8, 12, 0.46);
 }
 
-.employee-gallery-card img {
-  display: block;
-  width: 100%;
+.employee-gallery-dropzone {
   aspect-ratio: 4 / 3;
-  object-fit: cover;
-  border-radius: 8px;
 }
 
 .employee-gallery-card .employee-remove,
@@ -1247,12 +1301,8 @@ a {
   gap: 8px;
 }
 
-.employee-store-image {
-  display: block;
-  width: 100%;
+.employee-store-dropzone {
   aspect-ratio: 16 / 9;
-  object-fit: cover;
-  border-radius: 8px;
 }
 
 .employee-store-upload-group {
@@ -1711,7 +1761,7 @@ a {
     grid-template-columns: 108px minmax(0, 1fr);
   }
 
-  .employee-item-card img {
+  .employee-tire-dropzone {
     width: 108px;
     height: 108px;
   }
@@ -1766,6 +1816,7 @@ a {
 
   .locations-copy h2 {
     font-size: clamp(2.35rem, 11vw, 3.4rem);
+    white-space: normal;
   }
 
   .map-panel,
